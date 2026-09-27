@@ -8,7 +8,7 @@ import bcrypt
 
 from app.database import get_db
 from app.models import User
-from app.schemas import LoginRequest, TokenResponse, UserResponse
+from app.schemas import LoginRequest, TokenResponse, UserResponse, ChangePasswordRequest, AdminResetPasswordRequest
 from app.config import get_settings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -103,3 +103,78 @@ def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depend
 def get_me(current_user: User = Depends(get_current_user)):
     """Get current authenticated user info."""
     return current_user
+
+
+@router.post("/change-password")
+def change_password(
+    request: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Change password for the currently authenticated user. Requires current password."""
+    if not verify_password(request.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña actual es incorrecta",
+        )
+    if request.new_password != request.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Las contraseñas nuevas no coinciden",
+        )
+    if len(request.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe tener al menos 8 caracteres",
+        )
+    if request.new_password == request.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La nueva contraseña debe ser diferente a la actual",
+        )
+
+    current_user.hashed_password = hash_password(request.new_password)
+    db.commit()
+    return {"message": "Contraseña actualizada correctamente"}
+
+
+@router.post("/admin/reset-password")
+def admin_reset_password(
+    request: AdminResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Admin CLI endpoint to reset the user password without knowing the current one.
+    Protected by ADMIN_SECRET_KEY from .env — not by JWT.
+
+    Usage:
+        curl -X POST http://localhost:8000/api/auth/admin/reset-password \\
+             -H 'Content-Type: application/json' \\
+             -d '{"admin_secret": "<ADMIN_SECRET_KEY>", "new_password": "nueva123"}'
+    """
+    if not settings.ADMIN_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="El endpoint admin no está habilitado. Configura ADMIN_SECRET_KEY en .env",
+        )
+    if request.admin_secret != settings.ADMIN_SECRET_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Clave admin incorrecta",
+        )
+    if len(request.new_password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La contraseña debe tener al menos 8 caracteres",
+        )
+
+    user = db.query(User).filter(User.is_active == True).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No se encontró un usuario activo",
+        )
+
+    user.hashed_password = hash_password(request.new_password)
+    db.commit()
+    return {"message": f"Contraseña del usuario '{user.username}' reestablecida correctamente"}

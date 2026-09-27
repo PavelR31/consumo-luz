@@ -17,8 +17,22 @@ class UserResponse(BaseModel):
     username: str
     is_active: bool
     created_at: datetime
+    telegram_chat_id: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class ChangePasswordRequest(BaseModel):
+    """Used by logged-in user to change their own password (requires current password)."""
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+class AdminResetPasswordRequest(BaseModel):
+    """Used via curl by admin - requires the ADMIN_SECRET_KEY from .env."""
+    admin_secret: str
+    new_password: str
 
 
 # ── Readings ──────────────────────────────────────────────────────────

@@ -115,7 +115,7 @@ def build_day_keyboard(year, month):
 
 # ========== Menú principal ==========
 
-def build_main_menu():
+def build_main_menu(is_linked: bool = False):
     keyboard = [
         [InlineKeyboardButton("📊 Ver Resumen", callback_data="menu_resumen")],
         [
@@ -124,9 +124,25 @@ def build_main_menu():
         ],
         [InlineKeyboardButton("✏️ Editar Inicio de Ciclo", callback_data="menu_editar_ciclo")],
         [InlineKeyboardButton("💰 Calcular Costo", callback_data="menu_costo")],
-        [InlineKeyboardButton("🔗 Vincular Cuenta", callback_data="menu_vincular")],
     ]
+    if is_linked:
+        keyboard.append([
+            InlineKeyboardButton("👤 Mi Cuenta", callback_data="menu_mi_cuenta"),
+            InlineKeyboardButton("🔓 Desvincular", callback_data="menu_desvincular"),
+        ])
+    else:
+        keyboard.append([InlineKeyboardButton("🔗 Vincular Cuenta", callback_data="menu_vincular")])
     return InlineKeyboardMarkup(keyboard)
+
+
+def get_is_linked(telegram_user_id: int) -> bool:
+    """Check if this Telegram user has an explicitly linked account."""
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.telegram_chat_id == str(telegram_user_id)).first()
+        return user is not None
+    finally:
+        db.close()
 
 
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -135,11 +151,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⛔ No estás autorizado.")
         return ConversationHandler.END
 
+    is_linked = get_is_linked(update.effective_user.id)
     msg = "⚡ *Menú Principal de Consumo Luz*\nSelecciona una opción:"
     if update.message:
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=build_main_menu())
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked))
     elif update.callback_query:
-        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu())
+        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked))
     return CHOOSING_ACTION
 
 
@@ -155,6 +172,7 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     data = query.data
+    is_linked = get_is_linked(update.effective_user.id)
 
     if data == "menu_resumen":
         await show_resumen(update, context)
@@ -189,6 +207,42 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
         )
         context.user_data['action'] = 'vincular'
         return WAITING_FOR_VALUE
+
+    elif data == "menu_mi_cuenta":
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.telegram_chat_id == str(update.effective_user.id)).first()
+            if user:
+                msg = (
+                    f"👤 *Mi Cuenta Vinculada*\n"
+                    f"━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 Usuario: `{user.username}`\n"
+                    f"📅 Cuenta creada: {user.created_at.strftime('%d/%m/%Y')}\n"
+                    f"✅ Estado: Activa\n"
+                    f"🔗 Telegram ID: `{user.telegram_chat_id}`"
+                )
+            else:
+                msg = "⚠️ No tienes una cuenta vinculada."
+        finally:
+            db.close()
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked))
+        return CHOOSING_ACTION
+
+    elif data == "menu_desvincular":
+        db = SessionLocal()
+        try:
+            user = db.query(User).filter(User.telegram_chat_id == str(update.effective_user.id)).first()
+            if user:
+                username = user.username
+                user.telegram_chat_id = None
+                db.commit()
+                msg = f"🔓 Cuenta *{username}* desvinculada correctamente.\nPuedes volver a vincularla cuando quieras."
+            else:
+                msg = "⚠️ No tenías una cuenta vinculada."
+        finally:
+            db.close()
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(False))
+        return CHOOSING_ACTION
 
     return CHOOSING_ACTION
 
@@ -306,7 +360,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             user.telegram_chat_id = str(update.effective_user.id)
             db.commit()
             await update.message.reply_text(f"✅ ¡Cuenta *{user.username}* vinculada con éxito!", parse_mode="Markdown")
-            await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu())
+            await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu(True))
             return CHOOSING_ACTION
         finally:
             db.close()

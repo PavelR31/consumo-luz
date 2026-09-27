@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "change-this-to-a-random-secret-key-min-32-chars"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440  # 24 hours
     ALGORITHM: str = "HS256"
+    # Admin CLI secret - used for curl-based password reset from server
+    ADMIN_SECRET_KEY: str = ""
 
     # Telegram
     TELEGRAM_BOT_TOKEN: str = ""
