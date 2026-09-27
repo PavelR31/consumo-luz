@@ -1,0 +1,84 @@
+﻿# ============================================================
+# SECRETOS Y VARIABLES DE ENTORNO
+# ============================================================
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+
+# ============================================================
+# PYTHON / BACKEND
+# ============================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+.mypy_cache/
+.pytest_cache/
+htmlcov/
+.coverage
+*.log
+
+# Base de datos SQLite local (se usa MySQL en prod)
+backend/consumo_luz.db
+*.db
+*.sqlite3
+
+# ============================================================
+# NODE / FRONTEND (Next.js)
+# ============================================================
+node_modules/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+*.tsbuildinfo
+next-env.d.ts
+
+# ============================================================
+# UPLOADS / DATOS GENERADOS
+# ============================================================
+data/uploads/
+backend/uploads/
+
+# ============================================================
+# DOCKER
+# ============================================================
+docker-compose.override.yml
+docker-compose.local.yml
+
+# ============================================================
+# IDEs / EDITORES
+# ============================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ============================================================
+# SISTEMA OPERATIVO
+# ============================================================
+desktop.ini
+$RECYCLE.BIN/
+
+# ============================================================
+# BASE DE DATOS (archivos internos de MariaDB/MySQL del volumen)
+# ============================================================
+data/db/
+

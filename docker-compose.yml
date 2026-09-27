@@ -1,0 +1,80 @@
+name: consumoluz
+
+services:
+  db:
+    image: mariadb:10.11
+    container_name: consumoluz_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "3307:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: consumoluz_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mysql+pymysql://${DB_USER}:${DB_PASSWORD}@db:3306/${DB_NAME}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Volumen mapeado a local para persistir las fotos y OCR
+      - ./data/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "python migrate_db.py && uvicorn main:app --host 0.0.0.0 --port 8000"
+
+  bot:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: consumoluz_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mysql+pymysql://${DB_USER}:${DB_PASSWORD}@db:3306/${DB_NAME}
+      - API_URL=http://api:8000
+    volumes:
+      - ./data/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+    command: ["python", "bot.py"]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    container_name: consumoluz_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  db_data:
