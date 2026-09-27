@@ -23,6 +23,7 @@ services:
       retries: 5
 
   api:
+    image: consumoluz_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -45,6 +46,7 @@ services:
       sh -c "python migrate_db.py && uvicorn main:app --host 0.0.0.0 --port 8000"
 
   bot:
+    image: consumoluz_backend:latest
     build:
       context: ./backend
       dockerfile: Dockerfile

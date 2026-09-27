@@ -19,9 +19,10 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Install Python dependencies
+# Install Python dependencies (install PyTorch CPU-only first to prevent downloading 4.5GB of unused NVIDIA CUDA libs)
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
