@@ -19,6 +19,7 @@ from telegram.ext import (
     ContextTypes,
     filters,
 )
+from telegram.error import BadRequest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -240,7 +241,11 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
                 msg = "⚠️ No tienes una cuenta vinculada."
         finally:
             db.close()
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked=is_linked))
+        try:
+            await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked=is_linked))
+        except BadRequest as e:
+            if "Message is not modified" not in str(e):
+                raise
         return CHOOSING_ACTION
 
     elif data == "menu_desvincular":
@@ -535,7 +540,11 @@ async def show_resumen(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         menu_markup = build_main_menu(user_id=update.effective_user.id)
         if update.callback_query:
-            await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=menu_markup)
+            try:
+                await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=menu_markup)
+            except BadRequest as e:
+                if "Message is not modified" not in str(e):
+                    raise
         else:
             await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=menu_markup)
 
