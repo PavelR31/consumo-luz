@@ -115,7 +115,13 @@ def build_day_keyboard(year, month):
 
 # ========== Menú principal ==========
 
-def build_main_menu(is_linked: bool = False):
+def build_main_menu(user_id: int | None = None, is_linked: bool | None = None):
+    if is_linked is None:
+        if user_id is not None:
+            is_linked = get_is_linked(user_id)
+        else:
+            is_linked = False
+
     keyboard = [
         [InlineKeyboardButton("📊 Ver Resumen", callback_data="menu_resumen")],
         [
@@ -151,12 +157,12 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⛔ No estás autorizado.")
         return ConversationHandler.END
 
-    is_linked = get_is_linked(update.effective_user.id)
     msg = "⚡ *Menú Principal de Consumo Luz*\nSelecciona una opción:"
+    markup = build_main_menu(user_id=update.effective_user.id)
     if update.message:
-        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked))
+        await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=markup)
     elif update.callback_query:
-        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked))
+        await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=markup)
     return CHOOSING_ACTION
 
 
@@ -172,7 +178,8 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
     query = update.callback_query
     await query.answer()
     data = query.data
-    is_linked = get_is_linked(update.effective_user.id)
+    user_id = update.effective_user.id
+    is_linked = get_is_linked(user_id)
 
     if data == "menu_resumen":
         await show_resumen(update, context)
@@ -200,6 +207,13 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
         return WAITING_FOR_VALUE
 
     elif data == "menu_vincular":
+        if is_linked:
+            await query.edit_message_text(
+                "ℹ️ Ya tienes una cuenta vinculada. Puedes verla en *👤 Mi Cuenta* o gestionarla desde el menú.",
+                parse_mode="Markdown",
+                reply_markup=build_main_menu(is_linked=True)
+            )
+            return CHOOSING_ACTION
         await query.edit_message_text(
             "🔗 Para vincular tu cuenta, escribe tu usuario y contraseña separados por un espacio:\n"
             "Ej: `admin micontraseña`",
@@ -211,27 +225,28 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
     elif data == "menu_mi_cuenta":
         db = SessionLocal()
         try:
-            user = db.query(User).filter(User.telegram_chat_id == str(update.effective_user.id)).first()
+            user = db.query(User).filter(User.telegram_chat_id == str(user_id)).first()
             if user:
+                created = user.created_at.strftime('%d/%m/%Y') if user.created_at else 'N/A'
                 msg = (
                     f"👤 *Mi Cuenta Vinculada*\n"
                     f"━━━━━━━━━━━━━━━━━━━━\n"
                     f"🆔 Usuario: `{user.username}`\n"
-                    f"📅 Cuenta creada: {user.created_at.strftime('%d/%m/%Y')}\n"
-                    f"✅ Estado: Activa\n"
+                    f"📅 Cuenta creada: {created}\n"
+                    f"✅ Estado: {'Activa' if user.is_active else 'Inactiva'}\n"
                     f"🔗 Telegram ID: `{user.telegram_chat_id}`"
                 )
             else:
                 msg = "⚠️ No tienes una cuenta vinculada."
         finally:
             db.close()
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked))
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked=is_linked))
         return CHOOSING_ACTION
 
     elif data == "menu_desvincular":
         db = SessionLocal()
         try:
-            user = db.query(User).filter(User.telegram_chat_id == str(update.effective_user.id)).first()
+            user = db.query(User).filter(User.telegram_chat_id == str(user_id)).first()
             if user:
                 username = user.username
                 user.telegram_chat_id = None
@@ -241,7 +256,7 @@ async def handle_menu_selection(update: Update, context: ContextTypes.DEFAULT_TY
                 msg = "⚠️ No tenías una cuenta vinculada."
         finally:
             db.close()
-        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(False))
+        await query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu(is_linked=False))
         return CHOOSING_ACTION
 
     return CHOOSING_ACTION
@@ -354,13 +369,15 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
             user = db.query(User).filter(User.username == username).first()
             if not user or not verify_password(password, user.hashed_password):
                 await update.message.reply_text("❌ Credenciales inválidas.")
-                await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu())
+                await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu(user_id=update.effective_user.id))
                 return CHOOSING_ACTION
             
+            # Limpiar vínculo previo de este chat id si existía
+            db.query(User).filter(User.telegram_chat_id == str(update.effective_user.id)).update({User.telegram_chat_id: None})
             user.telegram_chat_id = str(update.effective_user.id)
             db.commit()
             await update.message.reply_text(f"✅ ¡Cuenta *{user.username}* vinculada con éxito!", parse_mode="Markdown")
-            await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu(True))
+            await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu(is_linked=True))
             return CHOOSING_ACTION
         finally:
             db.close()
@@ -394,7 +411,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
         finally:
             db.close()
         
-        await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu())
+        await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu(user_id=update.effective_user.id))
         return CHOOSING_ACTION
 
     # Lectura / Ciclo / Editar ciclo
@@ -454,7 +471,7 @@ async def handle_value_input(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 db.commit()
                 await update.message.reply_text(f"✅ Ciclo actualizado: Inicio *{selected_date}* con *{value} kWh*.", parse_mode="Markdown")
 
-        await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu())
+        await update.message.reply_text("⚡ ¿Qué más deseas hacer?", reply_markup=build_main_menu(user_id=update.effective_user.id))
         return CHOOSING_ACTION
 
     finally:
@@ -516,10 +533,11 @@ async def show_resumen(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     remaining = round(threshold - consumed, 2)
                     msg += f"\n✅ Margen de subsidio: {remaining} kWh restantes"
 
+        menu_markup = build_main_menu(user_id=update.effective_user.id)
         if update.callback_query:
-            await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=build_main_menu())
+            await update.callback_query.edit_message_text(msg, parse_mode="Markdown", reply_markup=menu_markup)
         else:
-            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=build_main_menu())
+            await update.message.reply_text(msg, parse_mode="Markdown", reply_markup=menu_markup)
 
     finally:
         db.close()

@@ -37,6 +37,7 @@ services:
     volumes:
       # Volumen mapeado a local para persistir las fotos y OCR
       - ./data/uploads:/app/uploads
+      - ./backend:/app
     depends_on:
       db:
         condition: service_healthy
@@ -56,6 +57,7 @@ services:
       - API_URL=http://api:8000
     volumes:
       - ./data/uploads:/app/uploads
+      - ./backend:/app
     depends_on:
       db:
         condition: service_healthy
