@@ -76,7 +76,7 @@ def build_year_keyboard():
     buttons = [InlineKeyboardButton(str(y), callback_data=f"cal_year_{y}") for y in years]
     return InlineKeyboardMarkup([
         buttons,
-        [InlineKeyboardButton("❌ Cancelar", callback_data="cal_cancel")]
+        [InlineKeyboardButton("Cancelar", callback_data="cal_cancel")]
     ])
 
 
@@ -89,7 +89,7 @@ def build_month_keyboard(year):
             idx = i + j
             row.append(InlineKeyboardButton(MESES[idx], callback_data=f"cal_month_{year}_{idx+1}"))
         rows.append(row)
-    rows.append([InlineKeyboardButton("⬅️ Volver", callback_data="cal_back_year")])
+    rows.append([InlineKeyboardButton("Volver", callback_data="cal_back_year")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -110,7 +110,7 @@ def build_day_keyboard(year, month):
                 row.append(InlineKeyboardButton(str(day), callback_data=f"cal_day_{year}_{month}_{day}"))
         rows.append(row)
     
-    rows.append([InlineKeyboardButton("⬅️ Volver", callback_data=f"cal_back_month_{year}")])
+    rows.append([InlineKeyboardButton("Volver", callback_data=f"cal_back_month_{year}")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -124,21 +124,21 @@ def build_main_menu(user_id: int | None = None, is_linked: bool | None = None):
             is_linked = False
 
     keyboard = [
-        [InlineKeyboardButton("📊 Ver Resumen", callback_data="menu_resumen")],
+        [InlineKeyboardButton("Ver Resumen", callback_data="menu_resumen")],
         [
-            InlineKeyboardButton("📝 Nueva Lectura", callback_data="menu_lectura"),
-            InlineKeyboardButton("🔄 Nuevo Ciclo", callback_data="menu_ciclo")
+            InlineKeyboardButton("Nueva Lectura", callback_data="menu_lectura"),
+            InlineKeyboardButton("Nuevo Ciclo", callback_data="menu_ciclo")
         ],
-        [InlineKeyboardButton("✏️ Editar Inicio de Ciclo", callback_data="menu_editar_ciclo")],
-        [InlineKeyboardButton("💰 Calcular Costo", callback_data="menu_costo")],
+        [InlineKeyboardButton("Editar Inicio de Ciclo", callback_data="menu_editar_ciclo")],
+        [InlineKeyboardButton("Calcular Costo", callback_data="menu_costo")],
     ]
     if is_linked:
         keyboard.append([
-            InlineKeyboardButton("👤 Mi Cuenta", callback_data="menu_mi_cuenta"),
-            InlineKeyboardButton("🔓 Desvincular", callback_data="menu_desvincular"),
+            InlineKeyboardButton("Mi Cuenta", callback_data="menu_mi_cuenta"),
+            InlineKeyboardButton("Desvincular", callback_data="menu_desvincular"),
         ])
     else:
-        keyboard.append([InlineKeyboardButton("🔗 Vincular Cuenta", callback_data="menu_vincular")])
+        keyboard.append([InlineKeyboardButton("Vincular Cuenta", callback_data="menu_vincular")])
     return InlineKeyboardMarkup(keyboard)
 
 
